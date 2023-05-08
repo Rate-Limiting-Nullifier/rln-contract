@@ -1,6 +1,10 @@
-name: test
+name: Tests
 
-on: workflow_dispatch
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 env:
   FOUNDRY_PROFILE: ci
