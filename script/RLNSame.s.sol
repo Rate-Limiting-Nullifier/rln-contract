@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+// SPDX-License-Identifier: Apache-2.0 or MIT
+pragma solidity ^0.8.17;
 
 import "forge-std/Script.sol";
 
-contract CounterScript is Script {
+contract RLNSameScript is Script {
     function setUp() public {}
 
     function run() public {
