@@ -53,15 +53,15 @@ contract RLN is Ownable {
     event MemberSlashed(uint256 pubkey, address slasher);
 
     /// @dev Emmited when a member was withdrawn.
-    /// @param pubkey: pubkey or `id_commitment`;
+    /// @param pubkey: pubkey or `id_commitment`.
     event MemberWithdrawn(uint256 pubkey);
 
-    /// @param membershipDeposit: Membership deposit;
-    /// @param depth: Depth of the merkle tree;
-    /// @param feePercentage: Fee percentage;
-    /// @param feeReceiver: Address of the fee receiver;
-    /// @param _token: Address of the ERC20 contract;
-    /// @param _verifier: Address of the Groth16 Verifier.
+    /// @param membershipDeposit: membership deposit;
+    /// @param depth: depth of the merkle tree;
+    /// @param feePercentage: fee percentage;
+    /// @param feeReceiver: address of the fee receiver;
+    /// @param _token: address of the ERC20 contract;
+    /// @param _verifier: address of the Groth16 Verifier.
     constructor(
         uint256 membershipDeposit,
         uint256 depth,
@@ -98,7 +98,7 @@ contract RLN is Ownable {
     ///
     /// NOTE: The set must have enough space to store whole batch.
     ///
-    /// @param pubkeys: Array of `id_commitment's`.
+    /// @param pubkeys: array of `id_commitment's`.
     function registerBatch(uint256[] calldata pubkeys) external {
         uint256 pubkeyLen = pubkeys.length;
         require(pubkeyLen != 0, "RLN, registerBatch: pubkeys array is empty");
@@ -126,8 +126,8 @@ contract RLN is Ownable {
     /// Transfer the entire stake to the receiver if they registered
     /// calculated pubkey, otherwise transfers `FEE` to the `FEE_RECEIVER`
     /// @param identityCommitment: `identityCommitment`;
-    /// @param receiver: Stake receiver;
-    /// @param proof: Snarkjs's format generated proof (without public inputs) packed consequently;
+    /// @param receiver: stake receiver;
+    /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
     function withdraw(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
         require(receiver != address(0), "RLN, withdraw: empty receiver address");
 
@@ -151,7 +151,7 @@ contract RLN is Ownable {
 
     /// @dev Changes fee percentage.
     ///
-    /// @param feePercentage: New fee percentage.
+    /// @param feePercentage: new fee percentage.
     function changeFeePercentage(uint8 feePercentage) external onlyOwner {
         FEE_PERCENTAGE = feePercentage;
         FEE_AMOUNT = (FEE_PERCENTAGE * MEMBERSHIP_DEPOSIT) / 100;
@@ -159,7 +159,7 @@ contract RLN is Ownable {
 
     /// @dev Changes fee receiver.
     ///
-    /// @param feeReceiver: New fee receiver.
+    /// @param feeReceiver: new fee receiver.
     function changeFeeReceiver(address feeReceiver) external onlyOwner {
         FEE_RECEIVER = feeReceiver;
     }
