@@ -34,10 +34,10 @@ contract RLN is Ownable {
     /// @dev Fee percentage.
     uint8 public FEE_PERCENTAGE;
 
-    /// @dev Current index where pubkey will be stored.
-    uint256 public pubkeyIndex = 0;
+    /// @dev Current index where idCommitment will be stored.
+    uint256 public idCommitmentIndex = 0;
 
-    /// @dev Registry set. The keys are `id_commitment`'s (or pubkey's).
+    /// @dev Registry set. The keys are `id_commitment`'s.
     /// The values are addresses of accounts that call `register` transaction.
     mapping(uint256 => User) public members;
 
@@ -48,19 +48,19 @@ contract RLN is Ownable {
     IVerifier public immutable verifier;
 
     /// @dev Emmited when a new member registered.
-    /// @param pubkey: pubkey or `id_commitment`;
-    /// @param index: pubkeyIndex value;
+    /// @param idCommitment: `id_commitment`;
+    /// @param index: idCommitmentIndex value;
     /// @param messageLimit: user's message limit.
-    event MemberRegistered(uint256 pubkey, uint256 index, uint256 messageLimit);
+    event MemberRegistered(uint256 idCommitment, uint256 index, uint256 messageLimit);
 
     /// @dev Emmited when a member was slashed.
-    /// @param pubkey: pubkey or `id_commitment`;
+    /// @param idCommitment: `id_commitment`;
     /// @param slasher: address of slasher (msg.sender).
-    event MemberSlashed(uint256 pubkey, address slasher);
+    event MemberSlashed(uint256 idCommitment, address slasher);
 
     /// @dev Emmited when a member was withdrawn.
-    /// @param pubkey: pubkey or `id_commitment`;
-    event MemberWithdrawn(uint256 pubkey);
+    /// @param idCommitment: `id_commitment`;
+    event MemberWithdrawn(uint256 idCommitment);
 
     /// @param minimalDeposit: Minimal membership deposit;
     /// @param depth: Depth of the merkle tree;
@@ -91,54 +91,56 @@ contract RLN is Ownable {
     ///
     /// NOTE: The set must not be full.
     ///
-    /// @param pubkey: `id_commitment`.
-    function register(uint256 pubkey, uint256 amount) external {
-        require(pubkeyIndex < SET_SIZE, "RLN, register: set is full");
+    /// @param idCommitment: `id_commitment`;
+    /// @param amount: stake amount.
+    function register(uint256 idCommitment, uint256 amount) external {
+        require(idCommitmentIndex < SET_SIZE, "RLN, register: set is full");
         require(amount >= MINIMAL_DEPOSIT, "RLN, register: amount is lower than minimal deposit");
 
         token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 messageLimit = amount / MINIMAL_DEPOSIT;
 
-        _register(pubkey, messageLimit);
+        _register(idCommitment, messageLimit);
     }
 
-    /// @dev Add batch of pubkeys to the registry set.
+    /// @dev Add batch of idCommitments to the registry set.
     ///
     /// NOTE: The set must have enough space to store whole batch.
     ///
-    /// @param pubkeys: Array of `id_commitment's`.
-    function registerBatch(uint256[] calldata pubkeys, uint256[] calldata amounts) external {
-        uint256 pubkeyLen = pubkeys.length;
-        require(pubkeyLen != 0, "RLN, registerBatch: pubkeys array is empty");
-        require(pubkeyLen == amounts.length, "RLN, registerBatch: invalid input");
-        require(pubkeyIndex + pubkeyLen <= SET_SIZE, "RLN, registerBatch: set is full");
+    /// @param idCommitments: Array of `id_commitment's`;
+    /// @param amounts: Array of stake amounts;
+    function registerBatch(uint256[] calldata idCommitments, uint256[] calldata amounts) external {
+        uint256 idCommitmentsLen = idCommitments.length;
+        require(idCommitmentsLen != 0, "RLN, registerBatch: idCommitments array is empty");
+        require(idCommitmentsLen == amounts.length, "RLN, registerBatch: invalid input");
+        require(idCommitmentIndex + idCommitmentsLen <= SET_SIZE, "RLN, registerBatch: set is full");
 
-        for (uint256 i = 0; i < pubkeyLen; i++) {
+        for (uint256 i = 0; i < idCommitmentsLen; i++) {
             uint256 amount = amounts[i];
             require(amount >= MINIMAL_DEPOSIT, "RLN, registerBatch: amount is lower than minimal deposit");
 
             token.safeTransferFrom(msg.sender, address(this), amount);
             uint256 messageLimit = amount / MINIMAL_DEPOSIT;
 
-            _register(pubkeys[i], messageLimit);
+            _register(idCommitments[i], messageLimit);
         }
     }
 
     /// @dev Internal register function. Sets the msg.sender as the value of the mapping.
     /// Doesn't allow duplicates.
-    /// @param pubkey: `id_commitment`.
-    function _register(uint256 pubkey, uint256 messageLimit) internal {
-        require(members[pubkey].userAddress == address(0), "Pubkey already registered");
+    /// @param idCommitment: `id_commitment`.
+    function _register(uint256 idCommitment, uint256 messageLimit) internal {
+        require(members[idCommitment].userAddress == address(0), "idCommitment already registered");
 
-        members[pubkey] = User(msg.sender, messageLimit);
-        emit MemberRegistered(pubkey, pubkeyIndex, messageLimit);
+        members[idCommitment] = User(msg.sender, messageLimit);
+        emit MemberRegistered(idCommitment, idCommitmentIndex, messageLimit);
 
-        pubkeyIndex += 1;
+        idCommitmentIndex += 1;
     }
 
-    /// @dev Remove the pubkey from the registry (withdraw/slash).
+    /// @dev Remove the idCommitment from the registry (withdraw/slash).
     /// Transfer the entire stake to the receiver if they registered
-    /// calculated pubkey, otherwise transfers `FEE` to the `FEE_RECEIVER`
+    /// calculated idCommitment, otherwise transfers `FEE` to the `FEE_RECEIVER`
     /// @param identityCommitment: `identityCommitment`;
     /// @param receiver: Stake receiver;
     /// @param proof: Snarkjs's format generated proof (without public inputs) packed consequently;
