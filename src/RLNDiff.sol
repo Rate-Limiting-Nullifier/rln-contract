@@ -96,41 +96,10 @@ contract RLN is Ownable {
     function register(uint256 idCommitment, uint256 amount) external {
         require(idCommitmentIndex < SET_SIZE, "RLN, register: set is full");
         require(amount >= MINIMAL_DEPOSIT, "RLN, register: amount is lower than minimal deposit");
+        require(members[idCommitment].userAddress == address(0), "RLN, register: idCommitment already registered");
 
         token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 messageLimit = amount / MINIMAL_DEPOSIT;
-
-        _register(idCommitment, messageLimit);
-    }
-
-    /// @dev Add batch of idCommitments to the registry set.
-    ///
-    /// NOTE: The set must have enough space to store whole batch.
-    ///
-    /// @param idCommitments: array of `id_commitment's`;
-    /// @param amounts: array of stake amounts.
-    function registerBatch(uint256[] calldata idCommitments, uint256[] calldata amounts) external {
-        uint256 idCommitmentsLen = idCommitments.length;
-        require(idCommitmentsLen != 0, "RLN, registerBatch: idCommitments array is empty");
-        require(idCommitmentsLen == amounts.length, "RLN, registerBatch: invalid input");
-        require(idCommitmentIndex + idCommitmentsLen <= SET_SIZE, "RLN, registerBatch: set is full");
-
-        for (uint256 i = 0; i < idCommitmentsLen; i++) {
-            uint256 amount = amounts[i];
-            require(amount >= MINIMAL_DEPOSIT, "RLN, registerBatch: amount is lower than minimal deposit");
-
-            token.safeTransferFrom(msg.sender, address(this), amount);
-            uint256 messageLimit = amount / MINIMAL_DEPOSIT;
-
-            _register(idCommitments[i], messageLimit);
-        }
-    }
-
-    /// @dev Internal register function. Sets the msg.sender as the value of the mapping.
-    /// Doesn't allow duplicates.
-    /// @param idCommitment: `id_commitment`.
-    function _register(uint256 idCommitment, uint256 messageLimit) internal {
-        require(members[idCommitment].userAddress == address(0), "idCommitment already registered");
 
         members[idCommitment] = User(msg.sender, messageLimit);
         emit MemberRegistered(idCommitment, idCommitmentIndex, messageLimit);
