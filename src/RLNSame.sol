@@ -29,10 +29,10 @@ contract RLN is Ownable {
     /// @dev Fee amount.
     uint256 public FEE_AMOUNT;
 
-    /// @dev Current index where pubkey will be stored.
-    uint256 public pubkeyIndex = 0;
+    /// @dev Current index where `id_commitment` will be stored.
+    uint256 public idCommitmentIndex = 0;
 
-    /// @dev Registry set. The keys are `id_commitment`'s (or pubkey's).
+    /// @dev Registry set. The keys are `id_commitment.
     /// The values are addresses of accounts that call `register` transaction.
     mapping(uint256 => address) public members;
 
@@ -43,18 +43,18 @@ contract RLN is Ownable {
     IVerifier public immutable verifier;
 
     /// @dev Emmited when a new member registered.
-    /// @param pubkey: pubkey or `id_commitment`;
-    /// @param index: pubkeyIndex value.
-    event MemberRegistered(uint256 pubkey, uint256 index);
+    /// @param idCommitment: `id_commitment`;
+    /// @param index: idCommitmentIndex value.
+    event MemberRegistered(uint256 idCommitment, uint256 index);
 
     /// @dev Emmited when a member was slashed.
-    /// @param pubkey: pubkey or `id_commitment`;
+    /// @param idCommitment: `id_commitment`;
     /// @param slasher: address of slasher (msg.sender).
-    event MemberSlashed(uint256 pubkey, address slasher);
+    event MemberSlashed(uint256 idCommitment, address slasher);
 
     /// @dev Emmited when a member was withdrawn.
-    /// @param pubkey: pubkey or `id_commitment`.
-    event MemberWithdrawn(uint256 pubkey);
+    /// @param idCommitment: `id_commitment`;
+    event MemberWithdrawn(uint256 idCommitment);
 
     /// @param membershipDeposit: membership deposit;
     /// @param depth: depth of the merkle tree;
@@ -86,66 +86,66 @@ contract RLN is Ownable {
     ///
     /// NOTE: The set must not be full.
     ///
-    /// @param pubkey: `id_commitment`.
-    function register(uint256 pubkey) external {
-        require(pubkeyIndex < SET_SIZE, "RLN, register: set is full");
+    /// @param idCommitment: `id_commitment`.
+    function register(uint256 idCommitment) external {
+        require(idCommitmentIndex < SET_SIZE, "RLN, register: set is full");
 
         token.safeTransferFrom(msg.sender, address(this), MEMBERSHIP_DEPOSIT);
-        _register(pubkey);
+        _register(idCommitment);
     }
 
-    /// @dev Add batch of pubkeys to the registry set.
+    /// @dev Add batch of `id_commitment`s to the registry set.
     ///
     /// NOTE: The set must have enough space to store whole batch.
     ///
-    /// @param pubkeys: array of `id_commitment's`.
-    function registerBatch(uint256[] calldata pubkeys) external {
-        uint256 pubkeyLen = pubkeys.length;
-        require(pubkeyLen != 0, "RLN, registerBatch: pubkeys array is empty");
-        require(pubkeyIndex + pubkeyLen <= SET_SIZE, "RLN, registerBatch: set is full");
+    /// @param idCommitments: array of `id_commitment's`.
+    function registerBatch(uint256[] calldata idCommitments) external {
+        uint256 len = idCommitments.length;
+        require(len != 0, "RLN, registerBatch: idCommitments array is empty");
+        require(idCommitmentIndex + len <= SET_SIZE, "RLN, registerBatch: set is full");
 
-        token.safeTransferFrom(msg.sender, address(this), MEMBERSHIP_DEPOSIT * pubkeyLen);
-        for (uint256 i = 0; i < pubkeyLen; i++) {
-            _register(pubkeys[i]);
+        token.safeTransferFrom(msg.sender, address(this), MEMBERSHIP_DEPOSIT * len);
+        for (uint256 i = 0; i < len; i++) {
+            _register(idCommitments[i]);
         }
     }
 
     /// @dev Internal register function. Sets the msg.sender as the value of the mapping.
     /// Doesn't allow duplicates.
-    /// @param pubkey: `id_commitment`.
-    function _register(uint256 pubkey) internal {
-        require(members[pubkey] == address(0), "Pubkey already registered");
+    /// @param idCommitment: `id_commitment`.
+    function _register(uint256 idCommitment) internal {
+        require(members[idCommitment] == address(0), "idCommitment already registered");
 
-        members[pubkey] = msg.sender;
-        emit MemberRegistered(pubkey, pubkeyIndex);
+        members[idCommitment] = msg.sender;
+        emit MemberRegistered(idCommitment, idCommitmentIndex);
 
-        pubkeyIndex += 1;
+        idCommitmentIndex += 1;
     }
 
-    /// @dev Remove the pubkey from the registry (withdraw/slash).
+    /// @dev Remove the id_commitment from the registry (withdraw/slash).
     /// Transfer the entire stake to the receiver if they registered
-    /// calculated pubkey, otherwise transfers `FEE` to the `FEE_RECEIVER`
-    /// @param identityCommitment: `identityCommitment`;
+    /// calculated idCommitment, otherwise transfers `FEE` to the `FEE_RECEIVER`
+    /// @param idCommitment: `id_ommitment`;
     /// @param receiver: stake receiver;
     /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
-    function withdraw(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
+    function withdraw(uint256 idCommitment, address receiver, uint256[8] calldata proof) external {
         require(receiver != address(0), "RLN, withdraw: empty receiver address");
 
-        address memberAddress = members[identityCommitment];
+        address memberAddress = members[idCommitment];
         require(memberAddress != address(0), "Member doesn't exist");
 
-        require(_verifyProof(identityCommitment, receiver, proof), "RLN, withdraw: invalid proof");
+        require(_verifyProof(idCommitment, receiver, proof), "RLN, withdraw: invalid proof");
 
-        delete members[identityCommitment];
+        delete members[idCommitment];
 
         // If memberAddress == receiver, then withdraw money without a fee
         if (memberAddress == receiver) {
             token.safeTransfer(receiver, MEMBERSHIP_DEPOSIT);
-            emit MemberWithdrawn(identityCommitment);
+            emit MemberWithdrawn(idCommitment);
         } else {
             token.safeTransfer(receiver, MEMBERSHIP_DEPOSIT - FEE_AMOUNT);
             token.safeTransfer(FEE_RECEIVER, FEE_AMOUNT);
-            emit MemberSlashed(identityCommitment, receiver);
+            emit MemberSlashed(idCommitment, receiver);
         }
     }
 

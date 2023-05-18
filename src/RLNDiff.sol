@@ -110,30 +110,30 @@ contract RLN is Ownable {
     /// @dev Remove the idCommitment from the registry (withdraw/slash).
     /// Transfer the entire stake to the receiver if they registered
     /// calculated idCommitment, otherwise transfers `FEE` to the `FEE_RECEIVER`
-    /// @param identityCommitment: `identityCommitment`;
+    /// @param idCommitment: `id_commitment`;
     /// @param receiver: stake receiver;
     /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
-    function withdraw(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
+    function withdraw(uint256 idCommitment, address receiver, uint256[8] calldata proof) external {
         require(receiver != address(0), "RLN, withdraw: empty receiver address");
 
-        User memory member = members[identityCommitment];
+        User memory member = members[idCommitment];
         require(member.userAddress != address(0), "Member doesn't exist");
 
-        require(_verifyProof(identityCommitment, receiver, proof), "RLN, withdraw: invalid proof");
+        require(_verifyProof(idCommitment, receiver, proof), "RLN, withdraw: invalid proof");
 
-        delete members[identityCommitment];
+        delete members[idCommitment];
 
         uint256 withdrawAmount = member.messageLimit * MINIMAL_DEPOSIT;
 
         // If memberAddress == receiver, then withdraw money without a fee
         if (member.userAddress == receiver) {
             token.safeTransfer(receiver, withdrawAmount);
-            emit MemberWithdrawn(identityCommitment);
+            emit MemberWithdrawn(idCommitment);
         } else {
             uint256 feeAmount = (FEE_PERCENTAGE * withdrawAmount) / 100;
             token.safeTransfer(receiver, withdrawAmount - feeAmount);
             token.safeTransfer(FEE_RECEIVER, feeAmount);
-            emit MemberSlashed(identityCommitment, receiver);
+            emit MemberSlashed(idCommitment, receiver);
         }
     }
 
