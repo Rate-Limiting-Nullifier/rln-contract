@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IVerifier} from "./IVerifier.sol";
 
-/// @title Rate-Limit Nullifier registry contract
+/// @title Rate-Limiting Nullifier registry contract
 /// @dev This contract allows you to register RLN commitment and withdraw/slash.
 contract RLN is Ownable {
     using SafeERC20 for IERC20;
@@ -34,10 +34,10 @@ contract RLN is Ownable {
     /// @dev Fee percentage.
     uint8 public FEE_PERCENTAGE;
 
-    /// @dev Current index where idCommitment will be stored.
-    uint256 public idCommitmentIndex = 0;
+    /// @dev Current index where identityCommitment will be stored.
+    uint256 public identityCommitmentIndex = 0;
 
-    /// @dev Registry set. The keys are `id_commitment`'s.
+    /// @dev Registry set. The keys are `identityCommitment`s.
     /// The values are addresses of accounts that call `register` transaction.
     mapping(uint256 => User) public members;
 
@@ -48,19 +48,19 @@ contract RLN is Ownable {
     IVerifier public immutable verifier;
 
     /// @dev Emmited when a new member registered.
-    /// @param idCommitment: `id_commitment`;
+    /// @param identityCommitment: `identityCommitment`;
     /// @param index: idCommitmentIndex value;
     /// @param messageLimit: user's message limit.
-    event MemberRegistered(uint256 idCommitment, uint256 index, uint256 messageLimit);
+    event MemberRegistered(uint256 identityCommitment, uint256 index, uint256 messageLimit);
 
     /// @dev Emmited when a member was slashed.
-    /// @param idCommitment: `id_commitment`;
+    /// @param identityCommitment: `identityCommitment`;
     /// @param slasher: address of slasher (msg.sender).
-    event MemberSlashed(uint256 idCommitment, address slasher);
+    event MemberSlashed(uint256 identityCommitment, address slasher);
 
     /// @dev Emmited when a member was withdrawn.
-    /// @param idCommitment: `id_commitment`;
-    event MemberWithdrawn(uint256 idCommitment);
+    /// @param identityCommitment: `identityCommitment`;
+    event MemberWithdrawn(uint256 identityCommitment);
 
     /// @param minimalDeposit: minimal membership deposit;
     /// @param depth: depth of the merkle tree;
@@ -87,53 +87,53 @@ contract RLN is Ownable {
         verifier = IVerifier(_verifier);
     }
 
-    /// @dev Adds `id_commitment` to the registry set and takes the necessary stake amount.
+    /// @dev Adds `identityCommitment` to the registry set and takes the necessary stake amount.
     ///
     /// NOTE: The set must not be full.
     ///
-    /// @param idCommitment: `id_commitment`;
+    /// @param identityCommitment: `identityCommitment`;
     /// @param amount: stake amount.
-    function register(uint256 idCommitment, uint256 amount) external {
-        require(idCommitmentIndex < SET_SIZE, "RLN, register: set is full");
+    function register(uint256 identityCommitment, uint256 amount) external {
+        require(identityCommitmentIndex < SET_SIZE, "RLN, register: set is full");
         require(amount >= MINIMAL_DEPOSIT, "RLN, register: amount is lower than minimal deposit");
-        require(members[idCommitment].userAddress == address(0), "RLN, register: idCommitment already registered");
+        require(members[identityCommitment].userAddress == address(0), "RLN, register: idCommitment already registered");
 
         token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 messageLimit = amount / MINIMAL_DEPOSIT;
 
-        members[idCommitment] = User(msg.sender, messageLimit);
-        emit MemberRegistered(idCommitment, idCommitmentIndex, messageLimit);
+        members[identityCommitment] = User(msg.sender, messageLimit);
+        emit MemberRegistered(identityCommitment, identityCommitmentIndex, messageLimit);
 
-        idCommitmentIndex += 1;
+        identityCommitmentIndex += 1;
     }
 
-    /// @dev Remove the idCommitment from the registry (withdraw/slash).
+    /// @dev Remove the identityCommitment from the registry (withdraw/slash).
     /// Transfer the entire stake to the receiver if they registered
-    /// calculated idCommitment, otherwise transfers `FEE` to the `FEE_RECEIVER`
-    /// @param idCommitment: `id_commitment`;
+    /// calculated identityCommitment, otherwise transfers `FEE` to the `FEE_RECEIVER`
+    /// @param identityCommitment: `identityCommitment`;
     /// @param receiver: stake receiver;
     /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
-    function withdraw(uint256 idCommitment, address receiver, uint256[8] calldata proof) external {
+    function withdraw(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
         require(receiver != address(0), "RLN, withdraw: empty receiver address");
 
-        User memory member = members[idCommitment];
+        User memory member = members[identityCommitment];
         require(member.userAddress != address(0), "Member doesn't exist");
 
-        require(_verifyProof(idCommitment, receiver, proof), "RLN, withdraw: invalid proof");
+        require(_verifyProof(identityCommitment, receiver, proof), "RLN, withdraw: invalid proof");
 
-        delete members[idCommitment];
+        delete members[identityCommitment];
 
         uint256 withdrawAmount = member.messageLimit * MINIMAL_DEPOSIT;
 
         // If memberAddress == receiver, then withdraw money without a fee
         if (member.userAddress == receiver) {
             token.safeTransfer(receiver, withdrawAmount);
-            emit MemberWithdrawn(idCommitment);
+            emit MemberWithdrawn(identityCommitment);
         } else {
             uint256 feeAmount = (FEE_PERCENTAGE * withdrawAmount) / 100;
             token.safeTransfer(receiver, withdrawAmount - feeAmount);
             token.safeTransfer(FEE_RECEIVER, feeAmount);
-            emit MemberSlashed(idCommitment, receiver);
+            emit MemberSlashed(identityCommitment, receiver);
         }
     }
 
@@ -152,7 +152,7 @@ contract RLN is Ownable {
     }
 
     /// @dev Groth16 proof verification
-    function _verifyProof(uint256 idCommitment, address receiver, uint256[8] calldata proof)
+    function _verifyProof(uint256 identityCommitment, address receiver, uint256[8] calldata proof)
         internal
         view
         returns (bool)
@@ -161,7 +161,7 @@ contract RLN is Ownable {
             [proof[0], proof[1]],
             [[proof[2], proof[3]], [proof[4], proof[5]]],
             [proof[6], proof[7]],
-            [idCommitment, uint256(uint160(receiver))]
+            [identityCommitment, uint256(uint160(receiver))]
         );
     }
 }

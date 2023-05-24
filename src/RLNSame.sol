@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IVerifier} from "./IVerifier.sol";
 
-/// @title Rate-Limit Nullifier registry contract
-/// @dev This contract allows you to register RLN commitment and withdraw/slash.
+/// @title Rate-Limiting Nullifier registry contract
+/// @dev This contract allows you to register RLN identityCommitment and withdraw/slash.
 contract RLN is Ownable {
     using SafeERC20 for IERC20;
 
@@ -29,32 +29,32 @@ contract RLN is Ownable {
     /// @dev Fee amount.
     uint256 public FEE_AMOUNT;
 
-    /// @dev Current index where `id_commitment` will be stored.
-    uint256 public idCommitmentIndex = 0;
+    /// @dev Current index where `identityCommitment` will be stored.
+    uint256 public identityCommitmentIndex = 0;
 
-    /// @dev Registry set. The keys are `id_commitment.
+    /// @dev Registry set. The keys are `identityCommitment`s.
     /// The values are addresses of accounts that call `register` transaction.
     mapping(uint256 => address) public members;
 
-    /// @dev ERC20 Token used for staking.
+    /// @dev ERC20 token used for staking.
     IERC20 public immutable token;
 
     /// @dev Groth16 verifier.
     IVerifier public immutable verifier;
 
     /// @dev Emmited when a new member registered.
-    /// @param idCommitment: `id_commitment`;
-    /// @param index: idCommitmentIndex value.
-    event MemberRegistered(uint256 idCommitment, uint256 index);
+    /// @param identityCommitment: `identityCommitment`;
+    /// @param index: identityCommitmentIndex value.
+    event MemberRegistered(uint256 identityCommitment, uint256 index);
 
     /// @dev Emmited when a member was slashed.
-    /// @param idCommitment: `id_commitment`;
+    /// @param identityCommitment: `identityCommitment`;
     /// @param slasher: address of slasher (msg.sender).
-    event MemberSlashed(uint256 idCommitment, address slasher);
+    event MemberSlashed(uint256 identityCommitment, address slasher);
 
     /// @dev Emmited when a member was withdrawn.
-    /// @param idCommitment: `id_commitment`;
-    event MemberWithdrawn(uint256 idCommitment);
+    /// @param identityCommitment: `identityCommitment`;
+    event MemberWithdrawn(uint256 identityCommitment);
 
     /// @param membershipDeposit: membership deposit;
     /// @param depth: depth of the merkle tree;
@@ -82,70 +82,70 @@ contract RLN is Ownable {
         verifier = IVerifier(_verifier);
     }
 
-    /// @dev Adds `id_commitment` to the registry set and takes the necessary stake amount.
+    /// @dev Adds `identityCommitment` to the registry set and takes the necessary stake amount.
     ///
     /// NOTE: The set must not be full.
     ///
-    /// @param idCommitment: `id_commitment`.
-    function register(uint256 idCommitment) external {
-        require(idCommitmentIndex < SET_SIZE, "RLN, register: set is full");
+    /// @param identityCommitment: `identityCommitment`.
+    function register(uint256 identityCommitment) external {
+        require(identityCommitmentIndex < SET_SIZE, "RLN, register: set is full");
 
         token.safeTransferFrom(msg.sender, address(this), MEMBERSHIP_DEPOSIT);
-        _register(idCommitment);
+        _register(identityCommitment);
     }
 
-    /// @dev Add batch of `id_commitment`s to the registry set.
+    /// @dev Add batch of `identityCommitment`s to the registry set.
     ///
     /// NOTE: The set must have enough space to store whole batch.
     ///
-    /// @param idCommitments: array of `id_commitment's`.
-    function registerBatch(uint256[] calldata idCommitments) external {
-        uint256 len = idCommitments.length;
+    /// @param identityCommitments: array of `identityCommitment`s.
+    function registerBatch(uint256[] calldata identityCommitments) external {
+        uint256 len = identityCommitments.length;
         require(len != 0, "RLN, registerBatch: idCommitments array is empty");
-        require(idCommitmentIndex + len <= SET_SIZE, "RLN, registerBatch: set is full");
+        require(identityCommitmentIndex + len <= SET_SIZE, "RLN, registerBatch: set is full");
 
         token.safeTransferFrom(msg.sender, address(this), MEMBERSHIP_DEPOSIT * len);
         for (uint256 i = 0; i < len; i++) {
-            _register(idCommitments[i]);
+            _register(identityCommitments[i]);
         }
     }
 
     /// @dev Internal register function. Sets the msg.sender as the value of the mapping.
     /// Doesn't allow duplicates.
-    /// @param idCommitment: `id_commitment`.
-    function _register(uint256 idCommitment) internal {
-        require(members[idCommitment] == address(0), "idCommitment already registered");
+    /// @param identityCommitment: `identityCommitment`.
+    function _register(uint256 identityCommitment) internal {
+        require(members[identityCommitment] == address(0), "idCommitment already registered");
 
-        members[idCommitment] = msg.sender;
-        emit MemberRegistered(idCommitment, idCommitmentIndex);
+        members[identityCommitment] = msg.sender;
+        emit MemberRegistered(identityCommitment, identityCommitmentIndex);
 
-        idCommitmentIndex += 1;
+        identityCommitmentIndex += 1;
     }
 
-    /// @dev Remove the id_commitment from the registry (withdraw/slash).
-    /// Transfer the entire stake to the receiver if they registered
-    /// calculated idCommitment, otherwise transfers `FEE` to the `FEE_RECEIVER`
-    /// @param idCommitment: `id_ommitment`;
+    /// @dev Remove the identityCommitment from the registry (withdraw/slash).
+    /// Transfer the entire stake to the receiver if they registered the
+    /// identityCommitment, otherwise transfers fee to the fee receiver
+    /// @param identityCommitment: `identityCommitment`;
     /// @param receiver: stake receiver;
     /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
-    function withdraw(uint256 idCommitment, address receiver, uint256[8] calldata proof) external {
+    function withdraw(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
         require(receiver != address(0), "RLN, withdraw: empty receiver address");
 
-        address memberAddress = members[idCommitment];
+        address memberAddress = members[identityCommitment];
         require(memberAddress != address(0), "Member doesn't exist");
 
-        require(_verifyProof(idCommitment, receiver, proof), "RLN, withdraw: invalid proof");
+        require(_verifyProof(identityCommitment, receiver, proof), "RLN, withdraw: invalid proof");
 
-        delete members[idCommitment];
+        delete members[identityCommitment];
 
         // If memberAddress == receiver, then withdraw money without a fee
         if (memberAddress == receiver) {
             token.safeTransfer(receiver, MEMBERSHIP_DEPOSIT);
-            emit MemberWithdrawn(idCommitment);
+            emit MemberWithdrawn(identityCommitment);
         } else {
             token.safeTransfer(receiver, MEMBERSHIP_DEPOSIT - FEE_AMOUNT);
             token.safeTransfer(FEE_RECEIVER, FEE_AMOUNT);
-            emit MemberSlashed(idCommitment, receiver);
+            emit MemberSlashed(identityCommitment, receiver);
         }
     }
 
@@ -165,7 +165,7 @@ contract RLN is Ownable {
     }
 
     /// @dev Groth16 proof verification
-    function _verifyProof(uint256 idCommitment, address receiver, uint256[8] calldata proof)
+    function _verifyProof(uint256 identityCommitment, address receiver, uint256[8] calldata proof)
         internal
         view
         returns (bool)
@@ -174,7 +174,7 @@ contract RLN is Ownable {
             [proof[0], proof[1]],
             [[proof[2], proof[3]], [proof[4], proof[5]]],
             [proof[6], proof[7]],
-            [idCommitment, uint256(uint160(receiver))]
+            [identityCommitment, uint256(uint160(receiver))]
         );
     }
 }
