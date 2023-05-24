@@ -89,33 +89,9 @@ contract RLN is Ownable {
     /// @param identityCommitment: `identityCommitment`.
     function register(uint256 identityCommitment) external {
         require(identityCommitmentIndex < SET_SIZE, "RLN, register: set is full");
-
-        token.safeTransferFrom(msg.sender, address(this), MEMBERSHIP_DEPOSIT);
-        _register(identityCommitment);
-    }
-
-    /// @dev Add batch of `identityCommitment`s to the registry set.
-    ///
-    /// NOTE: The set must have enough space to store whole batch.
-    ///
-    /// @param identityCommitments: array of `identityCommitment`s.
-    function registerBatch(uint256[] calldata identityCommitments) external {
-        uint256 len = identityCommitments.length;
-        require(len != 0, "RLN, registerBatch: idCommitments array is empty");
-        require(identityCommitmentIndex + len <= SET_SIZE, "RLN, registerBatch: set is full");
-
-        token.safeTransferFrom(msg.sender, address(this), MEMBERSHIP_DEPOSIT * len);
-        for (uint256 i = 0; i < len; i++) {
-            _register(identityCommitments[i]);
-        }
-    }
-
-    /// @dev Internal register function. Sets the msg.sender as the value of the mapping.
-    /// Doesn't allow duplicates.
-    /// @param identityCommitment: `identityCommitment`.
-    function _register(uint256 identityCommitment) internal {
         require(members[identityCommitment] == address(0), "idCommitment already registered");
 
+        token.safeTransferFrom(msg.sender, address(this), MEMBERSHIP_DEPOSIT);
         members[identityCommitment] = msg.sender;
         emit MemberRegistered(identityCommitment, identityCommitmentIndex);
 
