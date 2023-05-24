@@ -48,13 +48,13 @@ contract RLN is Ownable {
     event MemberRegistered(uint256 identityCommitment, uint256 index);
 
     /// @dev Emmited when a member was slashed.
-    /// @param identityCommitment: `identityCommitment`;
+    /// @param index: index of slashed member;
     /// @param slasher: address of slasher (msg.sender).
-    event MemberSlashed(uint256 identityCommitment, address slasher);
+    event MemberSlashed(uint256 index, address slasher);
 
     /// @dev Emmited when a member was withdrawn.
-    /// @param identityCommitment: `identityCommitment`;
-    event MemberWithdrawn(uint256 identityCommitment);
+    /// @param index: index of withdrawn member;
+    event MemberWithdrawn(uint256 index);
 
     /// @param membershipDeposit: membership deposit;
     /// @param depth: depth of the merkle tree;
