@@ -17,6 +17,7 @@ contract RLN is Ownable {
     struct User {
         address userAddress;
         uint256 messageLimit;
+        uint256 index;
     }
 
     /// @dev Minimal membership deposit (stake amount) value - cost of 1 message.
@@ -49,18 +50,18 @@ contract RLN is Ownable {
 
     /// @dev Emmited when a new member registered.
     /// @param identityCommitment: `identityCommitment`;
-    /// @param index: idCommitmentIndex value;
-    /// @param messageLimit: user's message limit.
-    event MemberRegistered(uint256 identityCommitment, uint256 index, uint256 messageLimit);
+    /// @param messageLimit: user's message limit;
+    /// @param index: idCommitmentIndex value.
+    event MemberRegistered(uint256 identityCommitment, uint256 messageLimit, uint256 index);
 
     /// @dev Emmited when a member was slashed.
-    /// @param identityCommitment: `identityCommitment`;
+    /// @param index: index of `identityCommitment`;
     /// @param slasher: address of slasher (msg.sender).
-    event MemberSlashed(uint256 identityCommitment, address slasher);
+    event MemberSlashed(uint256 index, address slasher);
 
     /// @dev Emmited when a member was withdrawn.
-    /// @param identityCommitment: `identityCommitment`;
-    event MemberWithdrawn(uint256 identityCommitment);
+    /// @param index: index of `identityCommitment`;
+    event MemberWithdrawn(uint256 index);
 
     /// @param minimalDeposit: minimal membership deposit;
     /// @param depth: depth of the merkle tree;
@@ -101,8 +102,8 @@ contract RLN is Ownable {
         token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 messageLimit = amount / MINIMAL_DEPOSIT;
 
-        members[identityCommitment] = User(msg.sender, messageLimit);
-        emit MemberRegistered(identityCommitment, identityCommitmentIndex, messageLimit);
+        members[identityCommitment] = User(msg.sender, messageLimit, identityCommitmentIndex);
+        emit MemberRegistered(identityCommitment, messageLimit, identityCommitmentIndex);
 
         identityCommitmentIndex += 1;
     }
@@ -128,12 +129,12 @@ contract RLN is Ownable {
         // If memberAddress == receiver, then withdraw money without a fee
         if (member.userAddress == receiver) {
             token.safeTransfer(receiver, withdrawAmount);
-            emit MemberWithdrawn(identityCommitment);
+            emit MemberWithdrawn(member.index);
         } else {
             uint256 feeAmount = (FEE_PERCENTAGE * withdrawAmount) / 100;
             token.safeTransfer(receiver, withdrawAmount - feeAmount);
             token.safeTransfer(FEE_RECEIVER, feeAmount);
-            emit MemberSlashed(identityCommitment, receiver);
+            emit MemberSlashed(member.index, receiver);
         }
     }
 
