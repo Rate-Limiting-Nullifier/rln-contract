@@ -42,26 +42,36 @@ contract RLN is Ownable {
     /// The values are addresses of accounts that call `register` transaction.
     mapping(uint256 => User) public members;
 
+    /// @dev Funds available for withdrawal.
+    /// The keys are addresses
+    /// The values are amounts of funds available for withdrawal.
+    mapping(address => uint256) public fundsAvailable;
+
     /// @dev ERC20 Token used for staking.
     IERC20 public immutable token;
 
     /// @dev Groth16 verifier.
     IVerifier public immutable verifier;
 
-    /// @dev Emmited when a new member registered.
+    /// @dev Emitted when a new member registered.
     /// @param identityCommitment: `identityCommitment`;
-    /// @param messageLimit: user's message limit;
-    /// @param index: idCommitmentIndex value.
+    /// @param messageLimit: user's message limit.
+    /// @param index: identityCommitmentIndex value;
     event MemberRegistered(uint256 identityCommitment, uint256 messageLimit, uint256 index);
 
-    /// @dev Emmited when a member was slashed.
-    /// @param index: index of `identityCommitment`;
+    /// @dev Emitted when a member was slashed.
+    /// @param index: `identityCommitmentIndex`;
     /// @param slasher: address of slasher (msg.sender).
     event MemberSlashed(uint256 index, address slasher);
 
-    /// @dev Emmited when a member was withdrawn.
-    /// @param index: index of `identityCommitment`;
-    event MemberWithdrawn(uint256 index);
+    /// @dev Emitted when a member was withdrawn.
+    /// @param identityCommitment: `identityCommitment`;
+    event MemberWithdrawn(uint256 identityCommitment);
+
+    /// @dev Emitted when funds were withdrawn.
+    /// @param receiver: address of the receiver;
+    /// @param amount: amount of funds.
+    event FundsWithdrawn(address receiver, uint256 amount);
 
     /// @param minimalDeposit: minimal membership deposit;
     /// @param depth: depth of the merkle tree;
@@ -108,19 +118,23 @@ contract RLN is Ownable {
         identityCommitmentIndex += 1;
     }
 
-    /// @dev Remove the identityCommitment from the registry (withdraw/slash).
-    /// Transfer the entire stake to the receiver if they registered
-    /// calculated identityCommitment, otherwise transfers `FEE` to the `FEE_RECEIVER`
+    /// @dev Remove the identityCommitment from the registry (slash).
+    /// Add the entire stake to the receiver if they registered
+    /// calculated identityCommitment, otherwise adds `FEE` to the `FEE_RECEIVER`
     /// @param identityCommitment: `identityCommitment`;
     /// @param receiver: stake receiver;
     /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
-    function withdraw(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
-        require(receiver != address(0), "RLN, withdraw: empty receiver address");
+    function slash(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
+        return _slash(identityCommitment, receiver, proof);
+    }
 
+    function _slash(uint256 identityCommitment, address receiver, uint256[8] calldata proof) internal {
+        require(receiver != address(0), "RLN, slash: empty receiver address");
+        
         User memory member = members[identityCommitment];
         require(member.userAddress != address(0), "Member doesn't exist");
 
-        require(_verifyProof(identityCommitment, receiver, proof), "RLN, withdraw: invalid proof");
+        require(_verifyProof(identityCommitment, receiver, proof), "RLN, slash: invalid proof");
 
         delete members[identityCommitment];
 
@@ -128,14 +142,26 @@ contract RLN is Ownable {
 
         // If memberAddress == receiver, then withdraw money without a fee
         if (member.userAddress == receiver) {
-            token.safeTransfer(receiver, withdrawAmount);
-            emit MemberWithdrawn(member.index);
+            fundsAvailable[receiver] += withdrawAmount;
+            emit MemberWithdrawn(identityCommitment);
         } else {
             uint256 feeAmount = (FEE_PERCENTAGE * withdrawAmount) / 100;
-            token.safeTransfer(receiver, withdrawAmount - feeAmount);
-            token.safeTransfer(FEE_RECEIVER, feeAmount);
-            emit MemberSlashed(member.index, receiver);
+            fundsAvailable[receiver] += withdrawAmount - feeAmount;
+            fundsAvailable[FEE_RECEIVER] += feeAmount;
+            emit MemberSlashed(identityCommitment, receiver);
         }
+    }
+
+    /// @dev Withdraws funds available for withdrawal.
+    function withdraw() external {
+        address receiver = msg.sender;
+        uint256 amount = fundsAvailable[receiver];
+        require(amount > 0, "RLN, withdraw: nothing to withdraw");
+
+        fundsAvailable[receiver] = 0;
+        token.safeTransfer(receiver, amount);
+
+        emit FundsWithdrawn(receiver, amount);
     }
 
     /// @dev Changes fee percentage.
