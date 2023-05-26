@@ -2,6 +2,6 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import "../src/RLNSame.sol";
+import "../src/RLN.sol";
 
-contract RLNSameTest is Test {}
+contract RLNTest is Test {}
