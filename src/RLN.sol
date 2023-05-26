@@ -130,7 +130,7 @@ contract RLN is Ownable {
 
     function _slash(uint256 identityCommitment, address receiver, uint256[8] calldata proof) internal {
         require(receiver != address(0), "RLN, slash: empty receiver address");
-        
+
         User memory member = members[identityCommitment];
         require(member.userAddress != address(0), "Member doesn't exist");
 
