@@ -11,13 +11,23 @@ import {IVerifier} from "./IVerifier.sol";
 contract RLN is Ownable {
     using SafeERC20 for IERC20;
 
-    /// @dev User metadata struct
+    /// @dev User metadata struct.
     /// @param userAddress: address of depositor;
     /// @param messageLimit: user's message limit (stakeAmount / MINIMAL_DEPOSIT).
     struct User {
         address userAddress;
         uint256 messageLimit;
         uint256 index;
+    }
+
+    /// @dev Withdrawal time-lock struct
+    /// @param blockNumber: number of block when a withdraw was initialized;
+    /// @param messageLimit: amount of tokens to freeze/release;
+    /// @param receiver: address of receiver.
+    struct Withdrawal {
+        uint256 blockNumber;
+        uint256 amount;
+        address receiver;
     }
 
     /// @dev Minimal membership deposit (stake amount) value - cost of 1 message.
@@ -35,12 +45,18 @@ contract RLN is Ownable {
     /// @dev Fee percentage.
     uint8 public FEE_PERCENTAGE;
 
+    /// @dev Freeze period - number of blocks for which the withdrawal of money is frozen.
+    uint256 public FREEZE_PERIOD;
+
     /// @dev Current index where identityCommitment will be stored.
     uint256 public identityCommitmentIndex = 0;
 
     /// @dev Registry set. The keys are `identityCommitment`s.
     /// The values are addresses of accounts that call `register` transaction.
     mapping(uint256 => User) public members;
+
+    /// @dev Withdrawals logic.
+    mapping(uint256 => Withdrawal) public withdrawals;
 
     /// @dev ERC20 Token used for staking.
     IERC20 public immutable token;
@@ -54,14 +70,18 @@ contract RLN is Ownable {
     /// @param index: idCommitmentIndex value.
     event MemberRegistered(uint256 identityCommitment, uint256 messageLimit, uint256 index);
 
+    /// @dev Emmited when a member was withdrawn.
+    /// @param index: index of `identityCommitment`;
+    event MemberWithdrawn(uint256 index);
+
+    /// @dev Emmited when a withdraw funds were released.
+    /// @param receiver: receiver of funds;
+    event WithdrawReleased(address receiver);
+
     /// @dev Emmited when a member was slashed.
     /// @param index: index of `identityCommitment`;
     /// @param slasher: address of slasher (msg.sender).
     event MemberSlashed(uint256 index, address slasher);
-
-    /// @dev Emmited when a member was withdrawn.
-    /// @param index: index of `identityCommitment`;
-    event MemberWithdrawn(uint256 index);
 
     /// @param minimalDeposit: minimal membership deposit;
     /// @param depth: depth of the merkle tree;
@@ -74,6 +94,7 @@ contract RLN is Ownable {
         uint256 depth,
         uint8 feePercentage,
         address feeReceiver,
+        uint256 freezePeriod,
         address _token,
         address _verifier
     ) {
@@ -83,6 +104,7 @@ contract RLN is Ownable {
 
         FEE_PERCENTAGE = feePercentage;
         FEE_RECEIVER = feeReceiver;
+        FREEZE_PERIOD = freezePeriod;
 
         token = IERC20(_token);
         verifier = IVerifier(_verifier);
@@ -108,13 +130,40 @@ contract RLN is Ownable {
         identityCommitmentIndex += 1;
     }
 
-    /// @dev Remove the identityCommitment from the registry (withdraw/slash).
-    /// Transfer the entire stake to the receiver if they registered
-    /// calculated identityCommitment, otherwise transfers `FEE` to the `FEE_RECEIVER`
+    /// @dev Request for withdraw and freeze the stake to prevent self-slashing. Stake can be
+    /// released after FREEZE_PERIOD blocks.
+    /// @param identityCommitment: `identityCommitment`;
+    /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
+    function withdraw(uint256 identityCommitment, uint256[8] calldata proof) external {
+        User memory member = members[identityCommitment];
+        require(member.userAddress != address(0), "RLN, withdraw: member doesn't exist");
+        require(withdrawals[identityCommitment].blockNumber == 0, "RLN, release: such withdrawal exists");
+        require(_verifyProof(identityCommitment, member.userAddress, proof), "RLN, withdraw: invalid proof");
+
+        uint256 withdrawAmount = member.messageLimit * MINIMAL_DEPOSIT;
+        withdrawals[identityCommitment] = Withdrawal(block.number, withdrawAmount, member.userAddress);
+        emit MemberWithdrawn(member.index);
+    }
+
+    /// @dev Releases stake amount.
+    /// @param identityCommitment: `identityCommitment` of withdrawn user.
+    function release(uint256 identityCommitment) external {
+        Withdrawal memory withdrawal = withdrawals[identityCommitment];
+        require(withdrawal.blockNumber != 0, "RLN, release: no such withdrawals");
+        require(block.number - withdrawal.blockNumber > FREEZE_PERIOD, "RLN, release: cannot release yet");
+
+        delete withdrawals[identityCommitment];
+        delete members[identityCommitment];
+
+        token.safeTransfer(withdrawal.receiver, withdrawal.amount);
+        emit WithdrawReleased(withdrawal.receiver);
+    }
+
+    /// @dev Slashes identity with identityCommitment.
     /// @param identityCommitment: `identityCommitment`;
     /// @param receiver: stake receiver;
     /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
-    function withdraw(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
+    function slash(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
         require(receiver != address(0), "RLN, withdraw: empty receiver address");
 
         User memory member = members[identityCommitment];
@@ -123,19 +172,14 @@ contract RLN is Ownable {
         require(_verifyProof(identityCommitment, receiver, proof), "RLN, withdraw: invalid proof");
 
         delete members[identityCommitment];
+        delete withdrawals[identityCommitment];
 
         uint256 withdrawAmount = member.messageLimit * MINIMAL_DEPOSIT;
+        uint256 feeAmount = (FEE_PERCENTAGE * withdrawAmount) / 100;
 
-        // If memberAddress == receiver, then withdraw money without a fee
-        if (member.userAddress == receiver) {
-            token.safeTransfer(receiver, withdrawAmount);
-            emit MemberWithdrawn(member.index);
-        } else {
-            uint256 feeAmount = (FEE_PERCENTAGE * withdrawAmount) / 100;
-            token.safeTransfer(receiver, withdrawAmount - feeAmount);
-            token.safeTransfer(FEE_RECEIVER, feeAmount);
-            emit MemberSlashed(member.index, receiver);
-        }
+        token.safeTransfer(receiver, withdrawAmount - feeAmount);
+        token.safeTransfer(FEE_RECEIVER, feeAmount);
+        emit MemberSlashed(member.index, receiver);
     }
 
     /// @dev Changes fee percentage.
@@ -150,6 +194,13 @@ contract RLN is Ownable {
     /// @param feeReceiver: new fee receiver.
     function changeFeeReceiver(address feeReceiver) external onlyOwner {
         FEE_RECEIVER = feeReceiver;
+    }
+
+    /// @dev Changes freeze period.
+    ///
+    /// @param freezePeriod: new freeze period.
+    function changeFreezePeriod(uint256 freezePeriod) external onlyOwner {
+        FREEZE_PERIOD = freezePeriod;
     }
 
     /// @dev Groth16 proof verification
