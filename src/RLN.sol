@@ -74,10 +74,6 @@ contract RLN is Ownable {
     /// @param index: index of `identityCommitment`;
     event MemberWithdrawn(uint256 index);
 
-    /// @dev Emmited when a withdraw funds were released.
-    /// @param receiver: receiver of funds;
-    event WithdrawReleased(address receiver);
-
     /// @dev Emmited when a member was slashed.
     /// @param index: index of `identityCommitment`;
     /// @param slasher: address of slasher (msg.sender).
@@ -156,7 +152,6 @@ contract RLN is Ownable {
         delete members[identityCommitment];
 
         token.safeTransfer(withdrawal.receiver, withdrawal.amount);
-        emit WithdrawReleased(withdrawal.receiver);
     }
 
     /// @dev Slashes identity with identityCommitment.
