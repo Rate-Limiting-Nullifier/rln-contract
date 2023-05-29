@@ -40,13 +40,13 @@ contract RLN is Ownable {
     uint256 public immutable SET_SIZE;
 
     /// @dev Address of the fee receiver.
-    address public FEE_RECEIVER;
+    address immutable FEE_RECEIVER;
 
     /// @dev Fee percentage.
-    uint8 public FEE_PERCENTAGE;
+    uint8 immutable FEE_PERCENTAGE;
 
     /// @dev Freeze period - number of blocks for which the withdrawal of money is frozen.
-    uint256 public FREEZE_PERIOD;
+    uint256 immutable FREEZE_PERIOD;
 
     /// @dev Current index where identityCommitment will be stored.
     uint256 public identityCommitmentIndex = 0;
@@ -176,27 +176,6 @@ contract RLN is Ownable {
         token.safeTransfer(receiver, withdrawAmount - feeAmount);
         token.safeTransfer(FEE_RECEIVER, feeAmount);
         emit MemberSlashed(member.index, receiver);
-    }
-
-    /// @dev Changes fee percentage.
-    ///
-    /// @param feePercentage: new fee percentage.
-    function changeFeePercentage(uint8 feePercentage) external onlyOwner {
-        FEE_PERCENTAGE = feePercentage;
-    }
-
-    /// @dev Changes fee receiver.
-    ///
-    /// @param feeReceiver: new fee receiver.
-    function changeFeeReceiver(address feeReceiver) external onlyOwner {
-        FEE_RECEIVER = feeReceiver;
-    }
-
-    /// @dev Changes freeze period.
-    ///
-    /// @param freezePeriod: new freeze period.
-    function changeFreezePeriod(uint256 freezePeriod) external onlyOwner {
-        FREEZE_PERIOD = freezePeriod;
     }
 
     /// @dev Groth16 proof verification
