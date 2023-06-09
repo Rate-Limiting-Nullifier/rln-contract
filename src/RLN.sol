@@ -115,6 +115,7 @@ contract RLN is Ownable {
     function register(uint256 identityCommitment, uint256 amount) external {
         require(identityCommitmentIndex < SET_SIZE, "RLN, register: set is full");
         require(amount >= MINIMAL_DEPOSIT, "RLN, register: amount is lower than minimal deposit");
+        require(amount % MINIMAL_DEPOSIT == 0, "RLN, register: amount should be a multiple of minimal deposit");
         require(members[identityCommitment].userAddress == address(0), "RLN, register: idCommitment already registered");
 
         token.safeTransferFrom(msg.sender, address(this), amount);
