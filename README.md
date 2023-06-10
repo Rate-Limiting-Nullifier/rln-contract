@@ -22,7 +22,7 @@ Test:
 forge test
 ```
 
-To use the automated proof and verifier contract geenration:
+To use the automated proof and verifier contract generation:
 - add the following to foundry.toml ```fs_permissions = [{ access = "read-write", path = "./"}]```
 - You need to have python3 installed.
 - You need to copy the artefacts (zkey files and .wasm files to a local directory)
