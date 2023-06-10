@@ -21,3 +21,10 @@ Test:
 ```bash
 forge test
 ```
+
+To use the automated proof and verifier contract geenration:
+- add the following to foundry.toml ```fs_permissions = [{ access = "read-write", path = "./"}]```
+- You need to have python3 installed.
+- You need to copy the artefacts (zkey files and .wasm files to a local directory)
+- You need to set the path to that directory in the test code.
+- Use the command ```forge test --ffi``` to enable the ffi cheatcode.
