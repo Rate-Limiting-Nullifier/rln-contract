@@ -8,6 +8,7 @@ import "forge-std/Test.sol";
 import "../src/RLN.sol";
 import {IVerifier} from "../src/IVerifier.sol";
 
+// A ERC20 token contract which allows arbitrary minting for testing
 contract TestERC20 is ERC20 {
     constructor() ERC20("TestERC20", "TST") {}
 
@@ -16,6 +17,7 @@ contract TestERC20 is ERC20 {
     }
 }
 
+// A mock verifier which makes us skip the proof verification.
 contract MockVerifier is IVerifier {
     bool public result;
 
@@ -37,6 +39,10 @@ contract MockVerifier is IVerifier {
 }
 
 contract RLNTest is Test {
+    event MemberRegistered(uint256 identityCommitment, uint256 messageLimit, uint256 index);
+    event MemberWithdrawn(uint256 index);
+    event MemberSlashed(uint256 index, address slasher);
+
     RLN rln;
     TestERC20 token;
     MockVerifier verifier;
@@ -85,8 +91,6 @@ contract RLNTest is Test {
         assertEq(address(rln.token()), address(token));
         assertEq(address(rln.verifier()), address(verifier));
         assertEq(rln.identityCommitmentIndex(), 0);
-
-        assertEq(token.balanceOf(address(rln)), 0);
     }
 
     /* register */
@@ -99,10 +103,9 @@ contract RLNTest is Test {
     }
 
     function test_register_fails_when_index_exceeds_set_size() public {
-        // Set size is (1 << smallDepth) = 2
+        // Set size is (1 << smallDepth) = 2, and thus there can
+        // only be 2 members, otherwise reverts.
         uint256 smallDepth = 1;
-        // uint256 smallSetSize = 1 << smallDepth;
-        //
         TestERC20 _token = new TestERC20();
         RLN smallRLN = new RLN(
             minimalDeposit,
@@ -114,25 +117,25 @@ contract RLNTest is Test {
             address(verifier)
         );
 
-        // register first user
+        // Register the first user
         _token.mint(user0, minimalDeposit);
         vm.startPrank(user0);
         _token.approve(address(smallRLN), minimalDeposit);
         smallRLN.register(identityCommitment0, minimalDeposit);
         vm.stopPrank();
-        // register second user
+        // Register the second user
         _token.mint(user1, minimalDeposit);
         vm.startPrank(user1);
         _token.approve(address(smallRLN), minimalDeposit);
         smallRLN.register(identityCommitment1, minimalDeposit);
         vm.stopPrank();
-        // Now tree (set) is full. Try register the third
+        // Now tree (set) is full. Try register the third. It should revert.
         address user2 = makeAddr("user2");
         uint256 identityCommitment2 = 9999;
         token.mint(user2, minimalDeposit);
         vm.startPrank(user2);
         token.approve(address(smallRLN), minimalDeposit);
-        // RLN, register: set is full
+        // `register` should revert
         vm.expectRevert("RLN, register: set is full");
         smallRLN.register(identityCommitment2, minimalDeposit);
         vm.stopPrank();
@@ -143,8 +146,6 @@ contract RLNTest is Test {
         token.mint(user0, rlnInitialTokenBalance);
         vm.startPrank(user0);
         token.approve(address(rln), rlnInitialTokenBalance);
-        // vm.expectRevert("ERC20: insufficient allowance");
-        // RLN, register: amount is lower than minimal deposit
         vm.expectRevert("RLN, register: amount is lower than minimal deposit");
         rln.register(identityCommitment0, insufficientAmount);
         vm.stopPrank();
@@ -157,7 +158,7 @@ contract RLNTest is Test {
         token.mint(user1, rlnInitialTokenBalance);
         vm.startPrank(user1);
         token.approve(address(rln), rlnInitialTokenBalance);
-        // Revert
+        // `register` should revert
         vm.expectRevert("RLN, register: idCommitment already registered");
         rln.register(identityCommitment0, rlnInitialTokenBalance);
         vm.stopPrank();
@@ -166,12 +167,18 @@ contract RLNTest is Test {
     /* withdraw */
 
     function test_withdraw_succeeds() public {
-        // register first
+        // Register first
         register(user0, identityCommitment0, messageLimit0);
-        // withdraw user0
-        // Make sure mock verifier always return true
+        // Make sure proof verification is skipped
         assertEq(verifier.result(), true);
+
+        // Withdraw user0
+        // Ensure event is emitted
+        (,, uint256 index) = rln.members(identityCommitment0);
+        vm.expectEmit(true, true, false, true);
+        emit MemberWithdrawn(index);
         rln.withdraw(identityCommitment0, mockProof);
+        // Check withdrawal entry is set correctly
         (uint256 blockNumber, uint256 amount, address receiver) = rln.withdrawals(identityCommitment0);
         assertEq(blockNumber, block.number);
         assertEq(amount, getRegisterAmount(messageLimit0));
@@ -179,26 +186,26 @@ contract RLNTest is Test {
     }
 
     function test_withdraw_fails_when_not_registered() public {
-        // Withdraw fails
+        // Withdraw fails if the user has not registered before
         vm.expectRevert("RLN, withdraw: member doesn't exist");
         rln.withdraw(identityCommitment0, mockProof);
     }
 
     function test_withdraw_fails_when_already_underways() public {
-        // register first
+        // Register first
         register(user0, identityCommitment0, messageLimit0);
-        // withdraw user0
+        // Withdraw user0
         rln.withdraw(identityCommitment0, mockProof);
-        // withdraw again
+        // Withdraw again and it should fail
         vm.expectRevert("RLN, release: such withdrawal exists");
         rln.withdraw(identityCommitment0, mockProof);
     }
 
     function test_withdraw_fails_when_invalid_proof() public {
-        // register first
+        // Register first
         register(user0, identityCommitment0, messageLimit0);
-        // withdraw user0
         // Make sure mock verifier always return false
+        // And thus the proof is always considered invalid
         verifier.changeResult(false);
         assertEq(verifier.result(), false);
         vm.expectRevert("RLN, withdraw: invalid proof");
@@ -208,18 +215,21 @@ contract RLNTest is Test {
     /* release */
 
     function test_release_succeeds() public {
-        // register first
+        // Register first
         register(user0, identityCommitment0, messageLimit0);
-        // withdraw user0
-        // Make sure mock verifier always return true
+        // Withdraw user0
+        // Make sure proof verification is skipped
         assertEq(verifier.result(), true);
         rln.withdraw(identityCommitment0, mockProof);
 
         // Test: release succeeds after freeze period
+        // Set block.number to `blockNumbersToRelease`
         uint256 blockNumbersToRelease = getUnfrozenBlockHeight();
         vm.roll(blockNumbersToRelease);
+
         uint256 user0BalanceBefore = token.balanceOf(user0);
         uint256 rlnBalanceBefore = token.balanceOf(address(rln));
+        // Calls release and check balances
         rln.release(identityCommitment0);
         uint256 user0BalanceDiff = token.balanceOf(user0) - user0BalanceBefore;
         uint256 rlnBalanceDiff = rlnBalanceBefore - token.balanceOf(address(rln));
@@ -230,18 +240,19 @@ contract RLNTest is Test {
     }
 
     function test_release_fails_when_no_withdrawal() public {
-        // release fails
+        // Release fails if there is no withdrawal for the user
         vm.expectRevert("RLN, release: no such withdrawals");
         rln.release(identityCommitment0);
     }
 
     function test_release_fails_when_freeze_period() public {
-        // register first
+        // Register first
         register(user0, identityCommitment0, messageLimit0);
-        // withdraw user0
-        // Make sure mock verifier always return true
+        // Make sure mock verifier always return true to skip proof verification
         assertEq(verifier.result(), true);
+        // Withdraw user0
         rln.withdraw(identityCommitment0, mockProof);
+        // Ensure withdrawal is set
         (uint256 blockNumber, uint256 amount, address receiver) = rln.withdrawals(identityCommitment0);
         assertEq(blockNumber, block.number);
         assertEq(amount, getRegisterAmount(messageLimit0));
@@ -250,9 +261,8 @@ contract RLNTest is Test {
         // Test: release fails in freeze period
         vm.expectRevert("RLN, release: cannot release yet");
         rln.release(identityCommitment0);
-
+        // Set block.number to blockNumbersToRelease - 1, which is still in freeze period
         uint256 blockNumbersToRelease = getUnfrozenBlockHeight();
-        // release still fails
         vm.roll(blockNumbersToRelease - 1);
         vm.expectRevert("RLN, release: cannot release yet");
         rln.release(identityCommitment0);
@@ -269,6 +279,11 @@ contract RLNTest is Test {
         uint256 slashedReceiverBalanceBefore = token.balanceOf(slashedReceiver);
         uint256 rlnBalanceBefore = token.balanceOf(address(rln));
         uint256 feeReceiverBalanceBefore = token.balanceOf(feeReceiver);
+        // ensure event is emitted
+        (,, uint256 index) = rln.members(identityCommitment0);
+        vm.expectEmit(true, true, false, true);
+        emit MemberSlashed(index, slashedReceiver);
+        // Slash and check balances
         rln.slash(identityCommitment0, slashedReceiver, mockProof);
         uint256 slashedReceiverBalanceDiff = token.balanceOf(slashedReceiver) - slashedReceiverBalanceBefore;
         uint256 rlnBalanceDiff = rlnBalanceBefore - token.balanceOf(address(rln));
@@ -276,47 +291,48 @@ contract RLNTest is Test {
         assertEq(slashedReceiverBalanceDiff, slashReward);
         assertEq(rlnBalanceDiff, registerAmount);
         assertEq(feeReceiverBalanceDiff, slashFee);
-        // check user0 is slashed
+        // Check the record of user0 has been deleted
         checkUserIsDeleted(identityCommitment0);
 
         // Test: register, withdraw, ang get slashed before release
         register(user1, identityCommitment1, messageLimit1);
         rln.withdraw(identityCommitment1, mockProof);
         rln.slash(identityCommitment1, slashedReceiver, mockProof);
-        // check user1 is slashed
+        // Check the record of user1 has been deleted
         checkUserIsDeleted(identityCommitment1);
     }
 
     function test_slash_fails_when_receiver_is_zero() public {
-        // register first
+        // Register first
         register(user0, identityCommitment0, messageLimit0);
-        // slash user0
+        // Try slash user0 and it fails because of the zero address
         vm.expectRevert("RLN, slash: empty receiver address");
         rln.slash(identityCommitment0, address(0), mockProof);
     }
 
     function test_slash_fails_when_not_registered() public {
-        // slash fails
+        // It fails if the user is not registered yet
         vm.expectRevert("RLN, slash: member doesn't exist");
         rln.slash(identityCommitment0, slashedReceiver, mockProof);
     }
 
     function test_slash_fails_when_self_slashing() public {
-        // register first
+        // `slash` fails when receiver is the same as the registered msg.sender
         register(user0, identityCommitment0, messageLimit0);
-        // slash fails when receiver is the same as the registered msg.sender
         vm.expectRevert("RLN, slash: self-slashing is prohibited");
         rln.slash(identityCommitment0, user0, mockProof);
     }
 
     function test_slash_fails_when_invalid_proof() public {
-        // register first
+        // It fails if the proof is invalid
+        // Register first
         register(user0, identityCommitment0, messageLimit0);
-        // slash user0
         // Make sure mock verifier always return false
+        // And thus the proof is always considered invalid
         verifier.changeResult(false);
         assertEq(verifier.result(), false);
         vm.expectRevert("RLN, slash: invalid proof");
+        // Slash fails because of the invalid proof
         rln.slash(identityCommitment0, slashedReceiver, mockProof);
     }
 
@@ -326,25 +342,29 @@ contract RLNTest is Test {
     }
 
     function register(address user, uint256 identityCommitment, uint256 messageLimit) public {
+        // Mint to user first
         uint256 registerTokenAmount = getRegisterAmount(messageLimit);
         token.mint(user, registerTokenAmount);
-
+        // Remember the balance for later check
         uint256 tokenRLNBefore = token.balanceOf(address(rln));
         uint256 tokenUserBefore = token.balanceOf(user);
         uint256 identityCommitmentIndexBefore = rln.identityCommitmentIndex();
-
+        // User approves to rln and calls register
         vm.startPrank(user);
         token.approve(address(rln), registerTokenAmount);
+        // Ensure event is emitted
+        vm.expectEmit(true, true, false, true);
+        emit MemberRegistered(identityCommitment, messageLimit, identityCommitmentIndexBefore);
         rln.register(identityCommitment, registerTokenAmount);
         vm.stopPrank();
 
+        // Check states
         uint256 tokenRLNDiff = token.balanceOf(address(rln)) - tokenRLNBefore;
         uint256 tokenUserDiff = tokenUserBefore - token.balanceOf(user);
-
-        // rln state
+        // RLN state
         assertEq(rln.identityCommitmentIndex(), identityCommitmentIndexBefore + 1);
         assertEq(tokenRLNDiff, registerTokenAmount);
-        // user state
+        // User state
         (address userAddress, uint256 actualMessageLimit, uint256 index) = rln.members(identityCommitment);
         assertEq(userAddress, user);
         assertEq(actualMessageLimit, messageLimit);
@@ -357,12 +377,12 @@ contract RLNTest is Test {
     }
 
     function checkUserIsDeleted(uint256 identityCommitment) public {
-        // user state
+        // User state
         (address userAddress, uint256 actualMessageLimit, uint256 index) = rln.members(identityCommitment);
         assertEq(userAddress, address(0));
         assertEq(actualMessageLimit, 0);
         assertEq(index, 0);
-        // withdrawal state
+        // Withdrawal state
         (uint256 blockNumber, uint256 amount, address receiver) = rln.withdrawals(identityCommitment);
         assertEq(blockNumber, 0);
         assertEq(amount, 0);
