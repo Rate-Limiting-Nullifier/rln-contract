@@ -79,9 +79,9 @@ contract RLNTest is Test {
         assertEq(rln.MINIMAL_DEPOSIT(), minimalDeposit);
         assertEq(rln.DEPTH(), depth);
         assertEq(rln.SET_SIZE(), 1 << depth);
-        // assertEq(rln.FEE_PERCENTAGE(), feePercentage);
-        // assertEq(rln.FEE_RECEIVER(), feeReceiver);
-        // assertEq(rln.FREEZE_PERIOD(), freezePeriod);
+        assertEq(rln.FEE_PERCENTAGE(), feePercentage);
+        assertEq(rln.FEE_RECEIVER(), feeReceiver);
+        assertEq(rln.FREEZE_PERIOD(), freezePeriod);
         assertEq(address(rln.token()), address(token));
         assertEq(address(rln.verifier()), address(verifier));
         assertEq(rln.identityCommitmentIndex(), 0);

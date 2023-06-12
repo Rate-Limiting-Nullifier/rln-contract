@@ -39,13 +39,13 @@ contract RLN {
     uint256 public immutable SET_SIZE;
 
     /// @dev Address of the fee receiver.
-    address immutable FEE_RECEIVER;
+    address public immutable FEE_RECEIVER;
 
     /// @dev Fee percentage.
-    uint8 immutable FEE_PERCENTAGE;
+    uint8 public immutable FEE_PERCENTAGE;
 
     /// @dev Freeze period - number of blocks for which the withdrawal of money is frozen.
-    uint256 immutable FREEZE_PERIOD;
+    uint256 public immutable FREEZE_PERIOD;
 
     /// @dev Current index where identityCommitment will be stored.
     uint256 public identityCommitmentIndex = 0;
