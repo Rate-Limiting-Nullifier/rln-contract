@@ -79,7 +79,7 @@ contract RLNTest is Test {
         ffiInterface ffiCheat = ffiInterface(HEVM_ADDRESS);
 
         // The string array input varaibles used by ffi
-        string[] memory deployCommand = new string[](6);
+        string[] memory deployCommand = new string[](9);
         // The circom artefacts to use to export a Solidity contract.
         // The command is "snarkjs zkey export solidityverifier final.zkey verifier.sol"
         deployCommand[0] = "snarkjs";
@@ -88,6 +88,9 @@ contract RLNTest is Test {
         deployCommand[3] = "solidityverifier";
         deployCommand[4] = _keyfilename;
         deployCommand[5] = string.concat("./src/" ,_contractName);
+        deployCommand[6] = "&&";
+        deployCommand[7] = "forge";
+        deployCommand[8] = "build";
         //console.log("path to contract is: ",string.concat("./src/" ,_contractName));
         // A local variable to hold the output bytecode
         bytes memory commandResponse = ffiCheat.ffi(deployCommand);
