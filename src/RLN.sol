@@ -159,13 +159,13 @@ contract RLN is Ownable {
     /// @param receiver: stake receiver;
     /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
     function slash(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
-        require(receiver != address(0), "RLN, withdraw: empty receiver address");
+        require(receiver != address(0), "RLN, slash: empty receiver address");
 
         User memory member = members[identityCommitment];
         require(member.userAddress != address(0), "RLN, slash: member doesn't exist");
         require(member.userAddress != receiver, "RLN, slash: self-slashing is prohibited");
 
-        require(_verifyProof(identityCommitment, receiver, proof), "RLN, withdraw: invalid proof");
+        require(_verifyProof(identityCommitment, receiver, proof), "RLN, slash: invalid proof");
 
         delete members[identityCommitment];
         delete withdrawals[identityCommitment];
