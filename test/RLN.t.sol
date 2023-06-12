@@ -100,8 +100,8 @@ contract RLNTest is Test {
 
     }
 
-    /// @dev Runs the forge ffi command to generate a new Verifier contract using snarkjs commands.
-    /// the resulting contract will overwrite the verifier.sol in the src directory
+    /// @dev Runs the forge ffi command to generate a witness and proof for withdraw.
+    /// the resulting numbers will be populated into a uin256[8] array
     /// 
     ///
     /// @param _arteFactPath: full path to the artefacts eg. /home/user/workspace/keyfiles/final.key;
