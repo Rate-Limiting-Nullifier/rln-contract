@@ -48,7 +48,7 @@ contract RLN {
     uint256 public immutable FREEZE_PERIOD;
 
     /// @dev Current index where identityCommitment will be stored.
-    uint256 public identityCommitmentIndex = 0;
+    uint256 public identityCommitmentIndex;
 
     /// @dev Registry set. The keys are `identityCommitment`s.
     /// The values are addresses of accounts that call `register` transaction.
@@ -123,7 +123,9 @@ contract RLN {
         members[identityCommitment] = User(msg.sender, messageLimit, identityCommitmentIndex);
         emit MemberRegistered(identityCommitment, messageLimit, identityCommitmentIndex);
 
-        identityCommitmentIndex += 1;
+        unchecked {
+            identityCommitmentIndex += 1;
+        }
     }
 
     /// @dev Request for withdraw and freeze the stake to prevent self-slashing. Stake can be
