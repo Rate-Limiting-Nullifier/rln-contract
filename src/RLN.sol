@@ -3,12 +3,11 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import {IVerifier} from "./IVerifier.sol";
 
 /// @title Rate-Limiting Nullifier registry contract
 /// @dev This contract allows you to register RLN commitment and withdraw/slash.
-contract RLN is Ownable {
+contract RLN {
     using SafeERC20 for IERC20;
 
     /// @dev User metadata struct.
@@ -40,13 +39,13 @@ contract RLN is Ownable {
     uint256 public immutable SET_SIZE;
 
     /// @dev Address of the fee receiver.
-    address immutable FEE_RECEIVER;
+    address public immutable FEE_RECEIVER;
 
     /// @dev Fee percentage.
-    uint8 immutable FEE_PERCENTAGE;
+    uint8 public immutable FEE_PERCENTAGE;
 
     /// @dev Freeze period - number of blocks for which the withdrawal of money is frozen.
-    uint256 immutable FREEZE_PERIOD;
+    uint256 public immutable FREEZE_PERIOD;
 
     /// @dev Current index where identityCommitment will be stored.
     uint256 public identityCommitmentIndex = 0;
@@ -160,13 +159,13 @@ contract RLN is Ownable {
     /// @param receiver: stake receiver;
     /// @param proof: snarkjs's format generated proof (without public inputs) packed consequently.
     function slash(uint256 identityCommitment, address receiver, uint256[8] calldata proof) external {
-        require(receiver != address(0), "RLN, withdraw: empty receiver address");
+        require(receiver != address(0), "RLN, slash: empty receiver address");
 
         User memory member = members[identityCommitment];
         require(member.userAddress != address(0), "RLN, slash: member doesn't exist");
         require(member.userAddress != receiver, "RLN, slash: self-slashing is prohibited");
 
-        require(_verifyProof(identityCommitment, receiver, proof), "RLN, withdraw: invalid proof");
+        require(_verifyProof(identityCommitment, receiver, proof), "RLN, slash: invalid proof");
 
         delete members[identityCommitment];
         delete withdrawals[identityCommitment];
