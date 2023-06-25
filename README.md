@@ -6,23 +6,23 @@
 
 ## How to use
 
-Install Foundry framework:
+### Install Foundry framework:
 ```bash
 curl -L https://foundry.paradigm.xyz | bash
 foundryup
 ```
 
-Build:
+### Build:
 ```bash
 forge build
 ```
 
-Test:
+### Test:
 ```bash
 forge test
 ```
 
-Deploy:
+### Deploy:
 
 You can change values (env variables) used for 
 the contract initialization in `.env` file.
