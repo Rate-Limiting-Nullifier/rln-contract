@@ -21,3 +21,16 @@ Test:
 ```bash
 forge test
 ```
+
+Deploy:
+
+You can change values (env variables) used for 
+the contract initialization in `.env` file.
+
+To deploy to Goerli:
+```bash
+source .env
+forge script script/RLN.s.sol:RLNScript --rpc-url $GOERLI_RPC_URL --broadcast --etherscan-api-key <YOUR-API-KEY> --verifier-url https://api-goerli.etherscan.io//api --verify -vvvv --private-key <YOUR-PRIVATE-KEY>
+```
+
+This will also verify contracts on Etherscan.
