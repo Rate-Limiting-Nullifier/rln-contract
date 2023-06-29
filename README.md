@@ -34,3 +34,19 @@ forge script script/RLN.s.sol:RLNScript --rpc-url $GOERLI_RPC_URL --broadcast --
 ```
 
 This will also verify contracts on Etherscan.
+
+---
+
+## What's RLN?
+
+RLN is a zero-knowledge gadget that enables spam 
+prevention in anonymous environments.
+
+The core parts of RLN are:
+* [zk-circuits in Circom](https://github.com/Rate-Limiting-Nullifier/circom-rln)
+* registry smart-contract (this repo);
+* set of libraries to build app with RLN ([rlnjs](https://github.com/Rate-Limiting-Nullifier/rlnjs), [zerokit](https://github.com/vacp2p/zerokit))
+
+---
+
+To learn more on RLN and how it works - check out [documentation](https://rate-limiting-nullifier.github.io/rln-docs/)
