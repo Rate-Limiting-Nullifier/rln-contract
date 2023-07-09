@@ -32,9 +32,6 @@ contract RLN {
     /// @dev Minimal membership deposit (stake amount) value - cost of 1 message.
     uint256 public immutable MINIMAL_DEPOSIT;
 
-    /// @dev Depth of the Merkle Tree. Registry set is the size of 1 << DEPTH.
-    uint256 public immutable DEPTH;
-
     /// @dev Registry set size (1 << DEPTH).
     uint256 public immutable SET_SIZE;
 
@@ -82,6 +79,7 @@ contract RLN {
     /// @param depth: depth of the merkle tree;
     /// @param feePercentage: fee percentage;
     /// @param feeReceiver: address of the fee receiver;
+    /// @param freezePeriod: amount of blocks for withdrawal time-lock;
     /// @param _token: address of the ERC20 contract;
     /// @param _verifier: address of the Groth16 Verifier.
     constructor(
@@ -93,8 +91,9 @@ contract RLN {
         address _token,
         address _verifier
     ) {
+        require(feeReceiver != address(0), "RLN, constructor: fee receiver cannot be 0x0 address");
+
         MINIMAL_DEPOSIT = minimalDeposit;
-        DEPTH = depth;
         SET_SIZE = 1 << depth;
 
         FEE_PERCENTAGE = feePercentage;
@@ -112,7 +111,9 @@ contract RLN {
     /// @param identityCommitment: `identityCommitment`;
     /// @param amount: stake amount.
     function register(uint256 identityCommitment, uint256 amount) external {
-        require(identityCommitmentIndex < SET_SIZE, "RLN, register: set is full");
+        uint256 index = identityCommitmentIndex;
+
+        require(index < SET_SIZE, "RLN, register: set is full");
         require(amount >= MINIMAL_DEPOSIT, "RLN, register: amount is lower than minimal deposit");
         require(amount % MINIMAL_DEPOSIT == 0, "RLN, register: amount should be a multiple of minimal deposit");
         require(members[identityCommitment].userAddress == address(0), "RLN, register: idCommitment already registered");
@@ -120,8 +121,8 @@ contract RLN {
         token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 messageLimit = amount / MINIMAL_DEPOSIT;
 
-        members[identityCommitment] = User(msg.sender, messageLimit, identityCommitmentIndex);
-        emit MemberRegistered(identityCommitment, messageLimit, identityCommitmentIndex);
+        members[identityCommitment] = User(msg.sender, messageLimit, index);
+        emit MemberRegistered(identityCommitment, messageLimit, index);
 
         unchecked {
             identityCommitmentIndex += 1;
@@ -165,7 +166,6 @@ contract RLN {
 
         User memory member = members[identityCommitment];
         require(member.userAddress != address(0), "RLN, slash: member doesn't exist");
-        require(member.userAddress != receiver, "RLN, slash: self-slashing is prohibited");
 
         require(_verifyProof(identityCommitment, receiver, proof), "RLN, slash: invalid proof");
 

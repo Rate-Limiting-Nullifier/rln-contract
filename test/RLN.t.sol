@@ -83,7 +83,6 @@ contract RLNTest is Test {
 
     function test_initial_state() public {
         assertEq(rln.MINIMAL_DEPOSIT(), minimalDeposit);
-        assertEq(rln.DEPTH(), depth);
         assertEq(rln.SET_SIZE(), 1 << depth);
         assertEq(rln.FEE_PERCENTAGE(), feePercentage);
         assertEq(rln.FEE_RECEIVER(), feeReceiver);
@@ -314,13 +313,6 @@ contract RLNTest is Test {
         // It fails if the user is not registered yet
         vm.expectRevert("RLN, slash: member doesn't exist");
         rln.slash(identityCommitment0, slashedReceiver, mockProof);
-    }
-
-    function test_slash_fails_when_self_slashing() public {
-        // `slash` fails when receiver is the same as the registered msg.sender
-        register(user0, identityCommitment0, messageLimit0);
-        vm.expectRevert("RLN, slash: self-slashing is prohibited");
-        rln.slash(identityCommitment0, user0, mockProof);
     }
 
     function test_slash_fails_when_invalid_proof() public {
