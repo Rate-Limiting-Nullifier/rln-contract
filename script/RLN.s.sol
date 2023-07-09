@@ -8,6 +8,7 @@ import "../src/Verifier.sol";
 contract RLNScript is Script {
     function run() public {
         uint256 minimalDeposit = vm.envUint("MINIMAL_DEPOSIT");
+        uint256 maximalRate = vm.envUint("MAXIMAL_RATE");
         uint256 depth = vm.envUint("DEPTH");
         uint8 feePercentage = uint8(vm.envUint("FEE_PERCENTAGE"));
         address feeReceiver = vm.envAddress("FEE_RECEIVER");
@@ -17,7 +18,8 @@ contract RLNScript is Script {
         vm.startBroadcast();
 
         Verifier verifier = new Verifier();
-        RLN rln = new RLN(minimalDeposit, depth, feePercentage, feeReceiver, freezePeriod, token, address(verifier));
+        RLN rln =
+        new RLN(minimalDeposit, maximalRate, depth, feePercentage, feeReceiver, freezePeriod, token, address(verifier));
 
         vm.stopBroadcast();
     }

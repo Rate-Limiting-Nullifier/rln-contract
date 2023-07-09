@@ -49,6 +49,7 @@ contract RLNTest is Test {
 
     uint256 rlnInitialTokenBalance = 1000000;
     uint256 minimalDeposit = 100;
+    uint256 maximalRate = 1 << 16 - 1;
     uint256 depth = 20;
     uint8 feePercentage = 10;
     address feeReceiver = makeAddr("feeReceiver");
@@ -72,6 +73,7 @@ contract RLNTest is Test {
         verifier = new MockVerifier();
         rln = new RLN(
             minimalDeposit,
+            maximalRate,
             depth,
             feePercentage,
             feeReceiver,
@@ -108,6 +110,7 @@ contract RLNTest is Test {
         TestERC20 _token = new TestERC20();
         RLN smallRLN = new RLN(
             minimalDeposit,
+            maximalRate,
             smallDepth,
             feePercentage,
             feeReceiver,

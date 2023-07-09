@@ -32,6 +32,9 @@ contract RLN {
     /// @dev Minimal membership deposit (stake amount) value - cost of 1 message.
     uint256 public immutable MINIMAL_DEPOSIT;
 
+    /// @dev Maximal rate.
+    uint256 public immutable MAXIMAL_RATE;
+
     /// @dev Registry set size (1 << DEPTH).
     uint256 public immutable SET_SIZE;
 
@@ -76,6 +79,7 @@ contract RLN {
     event MemberSlashed(uint256 index, address slasher);
 
     /// @param minimalDeposit: minimal membership deposit;
+    /// @param maximalRate: maximal rate;
     /// @param depth: depth of the merkle tree;
     /// @param feePercentage: fee percentage;
     /// @param feeReceiver: address of the fee receiver;
@@ -84,6 +88,7 @@ contract RLN {
     /// @param _verifier: address of the Groth16 Verifier.
     constructor(
         uint256 minimalDeposit,
+        uint256 maximalRate,
         uint256 depth,
         uint8 feePercentage,
         address feeReceiver,
@@ -94,6 +99,7 @@ contract RLN {
         require(feeReceiver != address(0), "RLN, constructor: fee receiver cannot be 0x0 address");
 
         MINIMAL_DEPOSIT = minimalDeposit;
+        MAXIMAL_RATE = maximalRate;
         SET_SIZE = 1 << depth;
 
         FEE_PERCENTAGE = feePercentage;
@@ -118,8 +124,10 @@ contract RLN {
         require(amount % MINIMAL_DEPOSIT == 0, "RLN, register: amount should be a multiple of minimal deposit");
         require(members[identityCommitment].userAddress == address(0), "RLN, register: idCommitment already registered");
 
-        token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 messageLimit = amount / MINIMAL_DEPOSIT;
+        require(messageLimit <= MAXIMAL_RATE, "RLN, register: message limit cannot be more than MAXIMAL_RATE");
+
+        token.safeTransferFrom(msg.sender, address(this), amount);
 
         members[identityCommitment] = User(msg.sender, messageLimit, index);
         emit MemberRegistered(identityCommitment, messageLimit, index);
