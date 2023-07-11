@@ -318,6 +318,13 @@ contract RLNTest is Test {
         rln.slash(identityCommitment0, slashedReceiver, mockProof);
     }
 
+    function test_slash_fails_when_self_slashing() public {
+        // `slash` fails when receiver is the same as the registered msg.sender
+        register(user0, identityCommitment0, messageLimit0);
+        vm.expectRevert("RLN, slash: self-slashing is prohibited");
+        rln.slash(identityCommitment0, user0, mockProof);
+    }
+
     function test_slash_fails_when_invalid_proof() public {
         // It fails if the proof is invalid
         // Register first

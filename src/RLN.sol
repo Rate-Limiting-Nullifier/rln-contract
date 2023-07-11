@@ -133,7 +133,7 @@ contract RLN {
         emit MemberRegistered(identityCommitment, messageLimit, index);
 
         unchecked {
-            identityCommitmentIndex += 1;
+            identityCommitmentIndex = index + 1;
         }
     }
 
@@ -174,6 +174,7 @@ contract RLN {
 
         User memory member = members[identityCommitment];
         require(member.userAddress != address(0), "RLN, slash: member doesn't exist");
+        require(member.userAddress != receiver, "RLN, slash: self-slashing is prohibited");
 
         require(_verifyProof(identityCommitment, receiver, proof), "RLN, slash: invalid proof");
 
