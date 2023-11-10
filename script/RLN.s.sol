@@ -17,7 +17,7 @@ contract RLNScript is Script {
 
         vm.startBroadcast();
 
-        Verifier verifier = new Verifier();
+        Groth16Verifier verifier = new Groth16Verifier();
         RLN rln =
         new RLN(minimalDeposit, maximalRate, depth, feePercentage, feeReceiver, freezePeriod, token, address(verifier));
 
